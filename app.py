@@ -1,4 +1,3 @@
-
 from functools import wraps
 from flask import Flask, request, make_response, jsonify
 from flask_restful import Resource, Api
@@ -6,7 +5,8 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 
-import jwt
+import os
+import jwt  
 import datetime
 import json
 
@@ -15,21 +15,15 @@ api = Api(app)
 db = SQLAlchemy(app)
 CORS(app)
 
-PASSWORD = "password123"
-PUBLIC_IP_ADDRESS = "34.101.82.176"
-DBNAME = "proto1"
-PROJECT_ID ="capstone-prototype1"
-INSTANCE_NAME ="database-proto1"
-
 # Database Configuration
 # filename = os.path.dirname(os.path.abspath(__file__))
 # database = 'sqlite:///' + os.path.join(filename, 'db.sqlite')
 # app.config['SQLALCHEMY_DATABASE_URI'] = database
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:password123@localhost/database_1'
-app.config["SQLALCHEMY_DATABASE_URI"]= "mysql://root:password123@35.184.77.215/test1?unix_socket=/cloudsql/Testing-project:database1"
+app.config['SQLALCHEMY_DATABASE_URI']= "mysql://root:password123@34.101.66.201/worst-case-db?unix_socket=/cloudsql/worst-case:asia-southeast2:worst-case-instance"
+# app.config['SQLALCHEMY_DATABASE_URI'] = gen_connection_string()
 app.config["SECRET_KEY"] = "secretkey"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-
 
 class AuthModel(db.Model):
     email = db.Column(db.String(50), primary_key=True)
@@ -45,7 +39,7 @@ class AudioModel(db.Model):
     duration = db.Column(db.Time)
     data = db.Column(db.LargeBinary((2**32)-1))
 
-# db.create_all()
+db.create_all()
 
 # decorator
 def token_required(f):
@@ -147,4 +141,4 @@ api.add_resource(History, "/history", methods=["GET"])
 api.add_resource(Profile, "/profile", methods=["PUT"])
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run()
