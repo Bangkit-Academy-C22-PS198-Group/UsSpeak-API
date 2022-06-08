@@ -4,11 +4,20 @@ from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
+from mutagen.wave import WAVE
 
-import os
-import jwt  
+# import os
 import datetime
+import jwt  
 import json
+import tensorflow as tf
+import numpy as np
+import librosa
+import csv
+import random
+# import pickle
+# import numpy as np
+# import librosa
 
 app = Flask(__name__)
 api = Api(app)
@@ -19,11 +28,16 @@ CORS(app)
 # filename = os.path.dirname(os.path.abspath(__file__))
 # database = 'sqlite:///' + os.path.join(filename, 'db.sqlite')
 # app.config['SQLALCHEMY_DATABASE_URI'] = database
-# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+pymysql://root:password123@localhost/database_1'
-app.config['SQLALCHEMY_DATABASE_URI']= "mysql://root:password123@34.101.66.201/worst-case-db?unix_socket=/cloudsql/worst-case:asia-southeast2:worst-case-instance"
+# app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:password123@localhost/database_2'
+app.config['SQLALCHEMY_DATABASE_URI']= "mysql://root:password123@34.101.234.99/capstone-db?unix_socket=/cloudsql/c22-ps198-352707:asia-southeast2:c22-ps198-instance"
 # app.config['SQLALCHEMY_DATABASE_URI'] = gen_connection_string()
 app.config["SECRET_KEY"] = "secretkey"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
+
+path = 'new_model.h5'
+load_options = tf.saved_model.LoadOptions(experimental_io_device='/job:localhost')
+model = tf.keras.models.load_model(path, options=load_options)
+random = random.randint(1,3)
 
 class AuthModel(db.Model):
     email = db.Column(db.String(50), primary_key=True)
@@ -35,9 +49,10 @@ class AudioModel(db.Model):
     email_auth = db.Column(db.String(50))
     filename = db.Column(db.String(100), primary_key=True)
     emotion = db.Column(db.String(50))
-    date = db.Column(db.Date)
+    date = db.Column(db.DateTime, default=datetime.datetime.utcnow())
     duration = db.Column(db.Time)
     data = db.Column(db.LargeBinary((2**32)-1))
+    suggestion = db.Column(db.Text)
 
 db.create_all()
 
@@ -45,7 +60,7 @@ db.create_all()
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('x-access-token')
+        token = request.headers.get('authorization')
         if not token:
             return make_response(jsonify({'message': 'Token Missing'}), 401)
 
@@ -62,11 +77,19 @@ def token_required(f):
         return f(current_email, *args, **kwargs)
     return decorated
 
+def audio_duration(length):
+    hours = length // 3600  # calculate in hours
+    length %= 3600
+    mins = length // 60  # calculate in minutes
+    length %= 60
+    seconds = length  # calculate in seconds
+    return '{}:{}:{}'.format(hours, mins, seconds)
+
 class Register(Resource):
     def post(self):
-        data_name = request.form.get('name')
-        data_email = request.form.get('email')
-        data_password = request.form.get('password')
+        data_name = request.json.get('name')
+        data_email = request.json.get('email')
+        data_password = request.json.get('password')
 
         if data_email and data_password:
             dataModel = AuthModel(email=data_email, name=data_name, password=data_password)
@@ -77,8 +100,8 @@ class Register(Resource):
 
 class Login(Resource):
     def post(self):
-        data_email = request.form.get('email')
-        data_password = request.form.get('password')
+        data_email = request.json.get('email')
+        data_password = request.json.get('password')
 
         q_email = [data.email for data in AuthModel.query.all()]
         q_password = [data.password for data in AuthModel.query.all()]
@@ -95,16 +118,41 @@ class Login(Resource):
 class Upload(Resource):
     @token_required
     def post(current_email,self):
-        data_emotion = request.form.get('emotion')
-        non_object_date = request.form.get('date')
-        non_object_duration = request.form.get('duration')
-        file = request.files['file']
+        file = request.files.get('file')
+        
+        #load suggestion
+        filename = 'suggestion_fix.csv'
+        with open(filename, 'r') as f:
+            rows = list(csv.reader(f))
 
-        data_date = datetime.datetime.strptime(non_object_date, '%Y-%d-%m').date()
-        data_duration = datetime.datetime.strptime(non_object_duration, '%H:%M:%S').time()
-        upload_data = AudioModel(email_auth=current_email, emotion=data_emotion, date=data_date, duration=data_duration, filename=file.filename, data=file.read())
+        #predict
+        X, sample_rate = librosa.load(file, res_type="kaiser_fast")
+        mfcc = np.mean(librosa.feature.mfcc(y=X, sr=sample_rate, n_fft=4096, hop_length=256, n_mfcc=40).T,axis=0)
+        mfcc = mfcc.reshape(1,-1)
+        result = np.argmax(model.predict(mfcc), axis=-1)
+
+        for i in range(0, 6, 1):
+            if result[0] == i:
+                data_emotion = 'Sad'
+                data_suggestion = rows[i][random]
+                break
+            else:
+                data_emotion = rows[i][0]
+                data_suggestion = rows[i][random]
+                break
+
+        #duration
+        audio = WAVE(file)
+        audio_info = audio.info
+        length = int(audio_info.length)
+        duration = audio_duration(length)
+        data_duration = datetime.datetime.strptime(duration, '%H:%M:%S').time()
+
+        #check emotion
+        upload_data = AudioModel(email_auth=current_email, emotion=data_emotion, duration=data_duration, suggestion=data_suggestion, filename=file.filename, data=file.read())
         db.session.add(upload_data)
         db.session.commit()
+
         return make_response(jsonify({"message": file.filename + " Upload Success","error": False}),200)
 
 class History(Resource):
@@ -115,6 +163,7 @@ class History(Resource):
             {
                 "emotion" : data.emotion,
                 "duration" : json.dumps(data.duration, default=str),
+                "suggestion" : data.suggestion,
                 "date" : data.date
             } for data in q
         ] 
@@ -125,7 +174,7 @@ class Profile(Resource):
     def put(current_email, self):
         q = AuthModel.query.get(current_email)
         
-        data_name = request.form.get('name')
+        data_name = request.json.get('name')
         data_pp = request.files['picture']
         
         q.name = data_name
@@ -142,3 +191,4 @@ api.add_resource(Profile, "/profile", methods=["PUT"])
 
 if __name__ == "__main__":
     app.run()
+    
