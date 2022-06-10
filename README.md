@@ -57,7 +57,6 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
   ```
 	/login
   ```
-  
 - Method
     ```
 	POST
@@ -106,12 +105,10 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
     ```
 	/upload
     ```
-
 - Method
     ```
 	POST
     ```
-
 - Header
     ```
 	authorization: jwt token
@@ -120,7 +117,6 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
     ```
 	multipart/form-data
     ```
-
 - Data Params
     ```
 	file=[file]
@@ -137,27 +133,22 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
     ```
 	/history
     ```
-
 - Method
     ```
 	GET
     ```
-
 - Header
     ```
 	authorization: jwt token
     ```
-
 - Content-Type
 	```
     -
     ```
-
 - Data Params
 	```
     -
     ```
-
 - Success Response
     ```
 	    Code: 200
@@ -174,7 +165,6 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
     ```
 	/profile
     ```
-
 - Method
     ```
 	PUT
@@ -187,7 +177,6 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
     ```
 	application/json
     ```
-
 - Data Params
     ```
 	name
@@ -203,17 +192,14 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
     ```
 	/profile
     ```
-
 - Method
     ```
 	GET
     ```
-
 - Header
     ```
 	authorization: jwt token
     ```
-
 - Content-Type
     ```
 	-
@@ -227,7 +213,4 @@ Our API in Android app that can predict the audio emotion to suggest the user fo
 	 Code: 200
 	  Content: {"name": name, "email": email}
     ```
-
-	
-
-	
+    
