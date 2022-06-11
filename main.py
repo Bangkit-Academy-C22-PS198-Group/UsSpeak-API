@@ -5,7 +5,6 @@ from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 from mutagen.wave import WAVE
-from io import BytesIO
 
 # import os
 import datetime
@@ -16,9 +15,6 @@ import numpy as np
 import librosa
 import csv
 import random
-# import pickle
-# import numpy as np
-# import librosa
 
 app = Flask(__name__)
 api = Api(app)
@@ -32,11 +28,13 @@ app.config['SQLALCHEMY_DATABASE_URI']= "mysql://root:password123@34.101.234.99/c
 app.config["SECRET_KEY"] = "secretkey"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
+# Load ML Model
 path = 'new_model.h5'
 load_options = tf.saved_model.LoadOptions(experimental_io_device='/job:localhost')
 model = tf.keras.models.load_model(path, options=load_options)
 random = random.randint(1,3)
 
+# Create DB Table
 class AuthModel(db.Model):
     email = db.Column(db.String(50), primary_key=True)
     name = db.Column(db.String(50))
@@ -75,6 +73,7 @@ def token_required(f):
         return f(current_email, *args, **kwargs)
     return decorated
 
+# Get Audio Duration
 def audio_duration(length):
     hours = length // 3600  # calculate in hours
     length %= 3600
