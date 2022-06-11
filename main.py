@@ -1,10 +1,11 @@
 from functools import wraps
-from flask import Flask, request, make_response, jsonify
+from flask import Flask, request, make_response, jsonify, send_file
 from flask_restful import Resource, Api
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from functools import wraps
 from mutagen.wave import WAVE
+from io import BytesIO
 
 # import os
 import datetime
@@ -25,12 +26,9 @@ db = SQLAlchemy(app)
 CORS(app)
 
 # Database Configuration
-# filename = os.path.dirname(os.path.abspath(__file__))
-# database = 'sqlite:///' + os.path.join(filename, 'db.sqlite')
-# app.config['SQLALCHEMY_DATABASE_URI'] = database
 # app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://root:password123@localhost/database_2'
 app.config['SQLALCHEMY_DATABASE_URI']= "mysql://root:password123@34.101.234.99/capstone-db?unix_socket=/cloudsql/c22-ps198-352707:asia-southeast2:c22-ps198-instance"
-# app.config['SQLALCHEMY_DATABASE_URI'] = gen_connection_string()
+
 app.config["SECRET_KEY"] = "secretkey"
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 
@@ -132,11 +130,11 @@ class Upload(Resource):
         result = np.argmax(model.predict(mfcc), axis=-1)
 
         for i in range(0, 6, 1):
-            if result[0] == i:
+            if result[0] == 0:
                 data_emotion = 'Sad'
                 data_suggestion = rows[i][random]
                 break
-            else:
+            elif result[0] == i:
                 data_emotion = rows[i][0]
                 data_suggestion = rows[i][random]
                 break
@@ -167,7 +165,7 @@ class History(Resource):
                 "date" : data.date
             } for data in q
         ] 
-        return make_response(jsonify(output), 200)
+        return make_response(jsonify({"items": output}), 200)
 
 class Profile(Resource):
     @token_required
@@ -175,20 +173,26 @@ class Profile(Resource):
         q = AuthModel.query.get(current_email)
         
         data_name = request.json.get('name')
-        data_pp = request.files['picture']
-        
         q.name = data_name
-        q.picture = data_pp.read()
 
         db.session.commit()
-        return make_response(jsonify({'message': 'Name and Picture updated!', "error": False}), 200)
+        return make_response(jsonify({'message': 'Name has been updated', "error": False}), 200)
+    
+    @token_required
+    def get(current_email, self):
+        q = AuthModel.query.filter(AuthModel.email==current_email)
+        for data in q:
+            email = data.email
+            name = data.name
+
+        return make_response(jsonify({"name": name, "email": email}), 200)
 
 api.add_resource(Register, "/register", methods=["POST"])
 api.add_resource(Login, "/login", methods=["POST"])
 api.add_resource(Upload, "/upload", methods=["POST"])
 api.add_resource(History, "/history", methods=["GET"])
-api.add_resource(Profile, "/profile", methods=["PUT"])
+api.add_resource(Profile, "/profile", methods=["PUT", "GET"])
 
 if __name__ == "__main__":
-    app.run()
+    app.run(debug=True)
     
